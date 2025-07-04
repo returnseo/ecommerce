@@ -60,7 +60,16 @@ public class CategoryServiceCustom implements CategoryService{
 
     @Override
     public CategoryResponse getCategory(Long id) {
-        return null;
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("카테고리를 찾을 수 없습니다"));
+
+        List<Category> allCategories = categoryRepository.findAll();
+
+        Map<Long, List<Category>> childrenMap = allCategories.stream()
+                .filter(cat -> cat.getParentId() != null)
+                .collect(Collectors.groupingBy(Category::getParentId));
+
+        return buildCategoryHierarchy(category, childrenMap);
     }
 
     @Override
@@ -95,11 +104,79 @@ public class CategoryServiceCustom implements CategoryService{
 
     @Override
     public CategoryResponse updateCategory(Long id, CategoryRequest request) {
-        return null;
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("카테고리를 찾을 수 없습니다"));
+
+        Long parentId = null;
+        int depth = 1;
+
+        if (request.parentId() != null) {
+            Category parent = categoryRepository.findById(request.parentId())
+                    .orElseThrow(() -> new EntityNotFoundException("상위 카테고리를 찾을 수 없습니다."));
+
+            parentId = parent.getId();
+            depth = parent.getDepth() + 1;
+
+            // 자기 자신을 부모로 설정하는 경우가 없도록
+            if (parent.getId().equals(category.getId())) {
+                throw new IllegalArgumentException("자기 자신을 상위 카테고리로 설정할 수 없습니다.");
+            }
+
+            // 자신이 하위 카테고리를 부모로 설정하는 순환참조 금지
+            if (isDescendant(category, parent)) {
+                throw new IllegalArgumentException("하위 카테고리를 상위 카테고리로 설정할 수 없습니다.");
+            }
+
+        }
+
+        category = Category.builder()
+                .name(request.name())
+                .depth(depth)
+                .parentId(parentId)
+                .build();
+
+        categoryRepository.save(category);
+
+        return new CategoryResponse(
+                category.getId(),
+                category.getName(),
+                category.getDepth(),
+                category.getParentId(),
+                List.of()
+        );
     }
 
     @Override
     public void deleteCategory(Long id) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("카테고리를 찾을 수 없습니다."));
 
+        List<Category> children = categoryRepository.findByParentId(id);
+        if (!children.isEmpty()) {
+            throw new IllegalArgumentException("하위 카테고리가 있는 카테고리는 삭제할 수 없습니다.");
+        }
+
+        Long productCount = categoryRepository.countProductsByCategory(id);
+        if (productCount > 0) {
+            throw new IllegalArgumentException("카테고리에 속한 상품이 있는 경우 삭제할 수 없습니다.");
+        }
+
+        categoryRepository.delete(category);
+    }
+
+    private boolean isDescendant(Category ancestor, Category descendant) {
+        if (descendant.getParentId() == null) {
+            return false;
+        }
+
+        if (descendant.getParentId().equals(ancestor.getId())) {
+            return true;
+        }
+
+        // descendant 의 부모 카테고리를 조회
+        Category parent = categoryRepository.findById(descendant.getParentId())
+                .orElseThrow(() -> new EntityNotFoundException("카테고리를 찾을 수 없습니다"));
+
+        return isDescendant(ancestor, parent);
     }
 }

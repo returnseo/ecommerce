@@ -11,6 +11,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Objects;
+
 /**
  * Adapter Pattern: CJ대한통운 어댑터
  *
@@ -27,31 +31,39 @@ public class CjShippingAdapter implements ShippingGateway {
         log.info("CJ대한통운 어댑터 - 배송 등록 요청 변환 및 처리");
 
         // 1. 우리 시스템의 요청을 CJ API 형태로 변환
+        CjShippingRequest cjShipRequest = convertToCjRequest(request);
 
         // 2. CJ API 호출
+        CjShippingResponse cjShipResponse = cjShippingApi.registerDelivery(cjShipRequest);
 
         // 3. CJ 응답을 우리 시스템 형태로 변환
-        return null;
+        return convertToShippingResponse(cjShipResponse);
     }
 
     @Override
     public ShippingResponse getShippingStatus(String trackingNumber) {
         log.info("CJ대한통운 어댑터 - 배송 상태 조회: {}", trackingNumber);
-        return null;
+
+        CjTrackingResponse cjTrackResponse = cjShippingApi.getTrackingInfo(trackingNumber);
+
+        return convertTrackingToShippingResponse(cjTrackResponse);
     }
 
     @Override
     public ShippingResponse cancelShipping(String trackingNumber, String reason) {
         log.info("CJ대한통운 어댑터 - 배송 취소: {}, 사유: {}", trackingNumber, reason);
 
-        return null;
+        CjShippingResponse cjShipResponse = cjShippingApi.cancelDelivery(trackingNumber, reason);
+
+        return convertToShippingResponse(cjShipResponse);
     }
 
     @Override
     public int calculateShippingCost(ShippingRequest request) {
         // CJ API를 통해 실제 배송비 계산 (여기서는 간단 계산)
+        CjShippingRequest cjShipRequest = convertToCjRequest(request);
 
-        return 0;
+        return cjShippingApi.calculateDeliveryCharge(cjShipRequest);
     }
 
     @Override
@@ -63,7 +75,19 @@ public class CjShippingAdapter implements ShippingGateway {
      * 공통 요청을 CJ API 요청으로 변환
      */
     private CjShippingRequest convertToCjRequest(ShippingRequest request) {
-        return null;
+        return CjShippingRequest.builder()
+                .orderNo(request.orderId())
+                .senderName(request.senderName())
+                .senderTel(request.senderPhone())
+                .senderAddr(request.senderAddress())
+                .receiverName(request.receiverName())
+                .receiverTel(request.receiverPhone())
+                .receiverAddr(request.receiverAddress())
+                .receiverZipCode(request.receiverZipCode())
+                .weight(request.weight())
+                .boxType(request.packageType())
+                .deliveryMessage(request.deliveryMessage())
+                .build();
     }
 
     /**
@@ -81,15 +105,43 @@ public class CjShippingAdapter implements ShippingGateway {
     /**
      * CJ API 응답을 공통 응답으로 변환
      */
-    private ShippingResponse convertToShippingResponse(CjShippingResponse cjResponse) {
-        return null;
+//    private ShippingResponse convertToShippingResponse(CjShippingResponse cjResponse) {
+      private ShippingResponse convertToShippingResponse(CjShippingResponse cjResponse) {
+
+
+
+        return ShippingResponse.builder()
+                .success(Objects.equals(cjResponse.resultCode(), "0000"))
+                .trackingNumber(cjResponse.invoiceNo())
+                .status("")
+                .message(cjResponse.resultMessage())
+                .shippingCost(cjResponse.deliveryCharge())
+                .estimatedDeliveryDate(LocalDateTime.now())
+                .carrierName(getCarrierName())
+                .errorCode(Objects.equals(cjResponse.resultCode(), "0000") ? null : Objects.equals(cjResponse.resultCode(), "기타") ? null : "실패")
+                .build();
     }
 
     /**
      * CJ 배송 조회 응답을 공통 응답으로 변환
      */
     private ShippingResponse convertTrackingToShippingResponse(CjTrackingResponse cjResponse) {
-        return null;
+
+        String deliveryDateTimeStr = cjResponse.deliveryDateTime();
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+        LocalDateTime estimatedDeliveryDate = LocalDateTime.parse(deliveryDateTimeStr, formatter);
+
+        return ShippingResponse.builder()
+                .success(Objects.equals(cjResponse.resultCode(), "0000"))
+                .trackingNumber(cjResponse.invoiceNo())
+                .status(convertCjStatus(cjResponse.deliveryStatus()))
+                .message(cjResponse.resultMessage())
+                .estimatedDeliveryDate(estimatedDeliveryDate)
+                .carrierName(getCarrierName())
+                .errorCode(Objects.equals(cjResponse.resultCode(), "0000") ? null : cjResponse.resultCode())
+                .build();
     }
 
     /**

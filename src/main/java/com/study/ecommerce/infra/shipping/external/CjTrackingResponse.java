@@ -1,8 +1,11 @@
 package com.study.ecommerce.infra.shipping.external;
 
+import lombok.Builder;
+
 /**
  * CJ대한통운 배송 조회 응답 DTO
  */
+@Builder
 public record CjTrackingResponse(
         String resultCode,
         String resultMessage,

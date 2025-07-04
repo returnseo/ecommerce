@@ -1,7 +1,10 @@
 package com.study.ecommerce.infra.shipping.dto;
 
+import lombok.Builder;
+
 import java.time.LocalDateTime;
 
+@Builder
 public record ShippingResponse(
         boolean success,
         String trackingNumber,

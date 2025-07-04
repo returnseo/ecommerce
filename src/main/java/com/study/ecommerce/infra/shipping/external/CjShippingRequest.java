@@ -1,8 +1,11 @@
 package com.study.ecommerce.infra.shipping.external;
 
+import lombok.Builder;
+
 /**
  * CJ대한통운 API 요청 DTO (실제 API 명세와 유사)
  */
+@Builder
 public record CjShippingRequest(
         String orderNo,
         String senderName,

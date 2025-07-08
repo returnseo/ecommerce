@@ -1,31 +1,37 @@
 package com.study.ecommerce.domain.order.strategy.shipping;
 
+import com.study.ecommerce.domain.order.entity.Order;
+import org.springframework.stereotype.Component;
+
 import java.math.BigDecimal;
 
-import com.study.ecommerce.domain.order.entity.Order;
+/**
+ * 일반 배송
+ */
+@Component
+public class EconomyShippingStrategy implements ShippingStrategy{
+    private static final BigDecimal SHIPPING_COST = new BigDecimal("1500");
+    private static final BigDecimal FREE_SHIPPING_THRESHOLD = new BigDecimal("30000");
+    private static final int DELIVERY_DAYS = 5;
 
-public class EconomyShippingStrategy implements ShippingStrategy {
-    // 배송비
-    private static final BigDecimal DELIVERY_COST = new BigDecimal("3000");
-    private static final BigDecimal MINIMUM_AMOUNT= new BigDecimal("40000");
-
-    // 무료배송기준
     @Override
     public BigDecimal calculateShippingCost(Order order) {
-        if (order.getTotalAmount().compareTo(MINIMUM_AMOUNT) >= 0) {
+        if (order.getTotalAmount().compareTo(FREE_SHIPPING_THRESHOLD) >= 0) {
             return BigDecimal.ZERO;
         }
-        return DELIVERY_COST;
+        return SHIPPING_COST;
     }
 
     @Override
     public String getShippingPolicyName() {
-        return "기본 배송";
+        return "이코노미 배송 (5-7일)";
     }
 
-    // 배송날짜
     @Override
     public int getEstimatedDeliveryDays(Order order) {
-        return order.getTotalAmount().compareTo(DELIVERY_COST) > 0 ? 3 : 5;
+        return DELIVERY_DAYS;
     }
+    // 배송비
+    // 무료배송기준
+    // 배송날짜
 }

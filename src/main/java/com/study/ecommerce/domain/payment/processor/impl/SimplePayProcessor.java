@@ -21,35 +21,33 @@ public class SimplePayProcessor implements PaymentProcessor {
 
     @Override
     public PaymentResult process(PaymentRequest request) {
-
-        // 결제 유효성 검증
-        if (!isSupportedProvider(request.cardNumber())) {
+        if (!isSupportedProvider(request.simplePayProvider())) {
             return PaymentResult.builder()
                     .success(false)
-                    .message("사용 불가능한 간편 결제 입니다.")
-                    .paymentMethod("SIMPLE_PAYMENT")
+                    .message("지원하지 않는 간편결제 서비스 입니다.")
+                    .paymentMethod("SIMPLE_PAY")
                     .build();
         }
 
-        // 결제 한도를 확인
         if (request.amount() > MAX_AMOUNT) {
             return PaymentResult.builder()
                     .success(false)
-                    .message("결제 한도를 초과했습니다.")
-                    .paymentMethod("SIMPLE_PAYMENT")
+                    .message("간편결제 한도를 초과했습니다.")
+                    .paymentMethod("SIMPLE_PAY")
                     .build();
         }
 
-        String transactionId = UUID.randomUUID().toString();
+        // 실제 간편결제 처리
+        String transactionId = request.simplePayProvider() + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         int feeAmount = calculateFee(request.amount());
 
         return PaymentResult.builder()
                 .success(true)
                 .transactionId(transactionId)
-                .message("간편 결제가 완료되었습니다.")
+                .message(request.simplePayProvider() + " 결제가 완료되었습니다.")
                 .paidAmount(request.amount())
                 .feeAmount(feeAmount)
-                .paymentMethod("SIMPLE_PAYMENT")
+                .paymentMethod("SIMPLE_PAY")
                 .build();
     }
 
@@ -60,7 +58,7 @@ public class SimplePayProcessor implements PaymentProcessor {
 
     @Override
     public boolean supports(String paymentMethod) {
-        return "SIMPLE_PAYMENT".equals(paymentMethod);
+        return "SIMPLE_PAY".equals(paymentMethod);
     }
 
     @Override
@@ -69,7 +67,7 @@ public class SimplePayProcessor implements PaymentProcessor {
     }
 
     // isSupportedProvider(String provider)
-    private boolean isSupportedProvider(String payment) {
-        return payment != null && SUPPORTED_PROVIDERS.contains(payment);
+    private boolean isSupportedProvider(String provider) {
+        return provider != null && SUPPORTED_PROVIDERS.contains(provider);
     }
 }
